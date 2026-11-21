@@ -116,16 +116,10 @@ foreach (var sdef in secs) {
     double t = pb.Item3.X - pb.Item2.X, cut = pb.Item3.X + 18;
     // iš apačios į viršų -> žiūri į -x (į galinę plokštelę iš lauko)
     TSD.View.CreateSectionView(main, P(cut, yBot), P(cut, yTop), sdef.Item3, 18 + t + 10, 5, sva, sma, out sv, out sm);
-  } else if (va != null) {
-    var ab2 = boxes(va); var pA = byId(ab2, pb.Item1.Identifier.ID); var bA = byId(ab2, mainPart.Identifier.ID);
-    wph.SetCurrentTransformationPlane(gp);
-    if (pA != null && bA != null) {
-      double t = pA.Item3.Y - pA.Item2.Y; bool upper = (pA.Item2.Y + pA.Item3.Y) / 2 > (bA.Item2.Y + bA.Item3.Y) / 2;
-      double cut = upper ? pA.Item3.Y + 18 : pA.Item2.Y - 18, xa = pA.Item2.X - 40, xb = pA.Item3.X + 40;
-      // dešinė->kairė žiūri žemyn (-y), kairė->dešinė žiūri aukštyn (+y)
-      if (upper) TSD.View.CreateSectionView(va, P(xb, cut), P(xa, cut), sdef.Item3, 18 + t + 10, 5, sva, sma, out sv, out sm);
-      else TSD.View.CreateSectionView(va, P(xa, cut), P(xb, cut), sdef.Item3, 18 + t + 10, 5, sva, sma, out sv, out sm);
-    }
+  } else {
+    // tarpinė plokštelė: skersinis pjūvis šalia plokštelės (ne per vidurį), žiūrint į ją – rodo pakėlimą 5 142 5 ir padėtį 160 + 10
+    double cutX = pb.Item2.X - 30;
+    TSD.View.CreateSectionView(main, P(cutX, yTop), P(cutX, yBot), sdef.Item3, pb.Item3.X - cutX + 5, 5, sva, sma, out sv, out sm);
   }
   if (sv == null) { log.Append(sdef.Item1 + " failed; "); continue; }
   sv.Name = sdef.Item1; sv.Modify(); if (sm != null) { sm.Attributes.MarkName = sdef.Item1; sm.Modify(); }
@@ -138,16 +132,23 @@ foreach (var sdef in secs) {
   while (be.MoveNext()) { var bg = be.Current as TSM.BoltGroup; if (bg == null) continue; bg.Select();
     foreach (T3D.Point p in bg.BoltPositions) { hx.Add(System.Math.Round(p.X, 1)); hy.Add(System.Math.Round(p.Y, 1)); } }
   // plokštelės iškyša virš/po profiliu: taškai ant profilio
-  double qx = isMid ? x1 : cx;
-  dim(sv, new System.Collections.Generic.List<T3D.Point> { P(x1, y0), P(qx, bm.Item2.Y), P(qx, bm.Item3.Y), P(x1, y1) }, 1, 0, 10);
-  if (hx.Count > 0) {
-    double hyTop = hy.Max, hxLeft = hx.Min;
-    var t = new System.Collections.Generic.List<T3D.Point> { P(x0, y1) }; foreach (var x in hx) t.Add(P(x, hyTop)); t.Add(P(x1, y1));
-    dim(sv, t, 0, 1, 10);
-    var l = new System.Collections.Generic.List<T3D.Point> { P(x0, y0) }; foreach (var y in hy) l.Add(P(hxLeft, y)); l.Add(P(x0, y1));
-    dim(sv, l, -1, 0, 10);
+  if (isMid) {
+    // Jokūbas: B-B tik plokštelės pakėlimui (5 142 5) ir padėčiai; skylės rišamos detalės vaizde
+    bool right = (x0 + x1) / 2 > cx;
+    double po = right ? x1 : x0, pi = right ? x0 : x1, bfar = right ? bm.Item2.X : bm.Item3.X;
+    dim(sv, new System.Collections.Generic.List<T3D.Point> { P(po, y0), P(pi, bm.Item2.Y), P(pi, bm.Item3.Y), P(po, y1) }, right ? 1 : -1, 0, 10);
+    dim(sv, new System.Collections.Generic.List<T3D.Point> { P(bfar, bm.Item2.Y), P(pi, y0), P(po, y0) }, 0, -1, 10);
+  } else {
+    dim(sv, new System.Collections.Generic.List<T3D.Point> { P(x1, y0), P(cx, bm.Item2.Y), P(cx, bm.Item3.Y), P(x1, y1) }, 1, 0, 10);
+    if (hx.Count > 0) {
+      double hyTop = hy.Max, hxLeft = hx.Min;
+      var t = new System.Collections.Generic.List<T3D.Point> { P(x0, y1) }; foreach (var x in hx) t.Add(P(x, hyTop)); t.Add(P(x1, y1));
+      dim(sv, t, 0, 1, 10);
+      var l = new System.Collections.Generic.List<T3D.Point> { P(x0, y0) }; foreach (var y in hy) l.Add(P(hxLeft, y)); l.Add(P(x0, y1));
+      dim(sv, l, -1, 0, 10);
+    }
+    dim(sv, new System.Collections.Generic.List<T3D.Point> { P(x0, y0), P(x1, y0) }, 0, -1, 10);
   }
-  dim(sv, new System.Collections.Generic.List<T3D.Point> { P(x0, y0), P(x1, y0) }, 0, -1, 10);
   log.Append(sdef.Item1 + " plate " + System.Math.Round(x1 - x0) + "x" + System.Math.Round(y1 - y0) + " holes " + hx.Count + "x" + hy.Count + "; ");
 }
 wph.SetCurrentTransformationPlane(gp);
