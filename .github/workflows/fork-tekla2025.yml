@@ -27,16 +27,16 @@ jobs:
           path: src/TeklaMcp.Server/bin/Release/net48/
           if-no-files-found: error
       - name: Publish build to dist branch
-        shell: pwsh
+        shell: bash
         run: |
-          $out = "src/TeklaMcp.Server/bin/Release/net48"
+          set -x
+          cp -r src/TeklaMcp.Server/bin/Release/net48 "$RUNNER_TEMP/dist"
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          New-Item -ItemType Directory -Force -Path ../dist | Out-Null
-          Copy-Item -Recurse -Force "$out/*" ../dist/
-          Set-Location ../dist
-          git init -q
-          git checkout -q -b dist-tekla2025
-          git add -A
-          git commit -q -m "Build of ${{ github.sha }}"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" dist-tekla2025
+          git checkout --orphan dist-tekla2025
+          git rm -rfq .
+          git clean -fdxq
+          cp -r "$RUNNER_TEMP/dist/." .
+          git add -A -f
+          git commit -qm "Build of $GITHUB_SHA"
+          git push -f origin dist-tekla2025
