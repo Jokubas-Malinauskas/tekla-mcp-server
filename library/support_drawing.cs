@@ -94,13 +94,19 @@ foreach (var sv in new[] { va, vb }) {
     while (bolts.MoveNext()) { var bg = bolts.Current as TSM.BoltGroup; if (bg == null) continue; bg.Select();
       foreach (T3D.Point p in bg.BoltPositions) { hx.Add(System.Math.Round(p.X, 1)); hy.Add(System.Math.Round(p.Y, 1)); } }
   }
-  dim(sv, new[] { x0, px0, px1, x1 }, new[] { y0, y0, y0, y0 }, 0, -1, 10);
-  dim(sv, new[] { x1, x1, x1, x1 }, new[] { y0, py0, py1, y1 }, 1, 0, 10);
+  // taškai ant pačio profilio (liestinės taškai), ne ant plokštelės krašto
+  double cx = (px0 + px1) / 2, cy = (py0 + py1) / 2;
+  dim(sv, new[] { x0, px0, px1, x1 }, new[] { y0, cy, cy, y0 }, 0, -1, 10);
+  dim(sv, new[] { x1, cx, cx, x1 }, new[] { y0, py0, py1, y1 }, 1, 0, 10);
   if (hx.Count > 0) {
+    // taškai skylių centruose: viršutinė grandinė – viršutinė skylių eilė, kairė – kairysis stulpelis
+    double hyTop = hy.Max, hxLeft = hx.Min;
     var xs = new System.Collections.Generic.List<double> { x0 }; xs.AddRange(hx); xs.Add(x1);
-    dim(sv, xs.ToArray(), xs.Select(_ => y1).ToArray(), 0, 1, 10);
+    var xsy = xs.Select(_ => hyTop).ToArray(); xsy[0] = y1; xsy[xsy.Length - 1] = y1;
+    dim(sv, xs.ToArray(), xsy, 0, 1, 10);
     var ys = new System.Collections.Generic.List<double> { y0 }; ys.AddRange(hy); ys.Add(y1);
-    dim(sv, ys.Select(_ => x0).ToArray(), ys.ToArray(), -1, 0, 10);
+    var ysx = ys.Select(_ => hxLeft).ToArray(); ysx[0] = x0; ysx[ysx.Length - 1] = x0;
+    dim(sv, ysx, ys.ToArray(), -1, 0, 10);
     log.Append(sv.Name + " holes " + hx.Count + "x" + hy.Count + "; ");
   } else {
     dim(sv, new[] { x0, x1 }, new[] { y0, y0 }, 0, -1, 20);
