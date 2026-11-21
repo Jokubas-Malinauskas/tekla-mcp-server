@@ -3,6 +3,7 @@ name: Fork build Tekla 2025
 on:
   push:
     branches: [ main, jokubas ]
+    paths-ignore: [ "library/**" ]
   workflow_dispatch:
 
 permissions:
