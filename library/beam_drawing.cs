@@ -112,7 +112,7 @@ foreach (var sdef in secs) {
   var pb = sdef.Item2; double cutX = pb.Item2.X - 30;
   TSD.View sv; TSD.SectionMark sm;
   // iš viršaus žemyn -> žiūri į +x (į plokštelę)
-  TSD.View.CreateSectionView(main, P(cutX, yTop), P(cutX, yBot), sdef.Item3, 5, pb.Item3.X - cutX + 5, sva, sma, out sv, out sm);
+  TSD.View.CreateSectionView(main, P(cutX, yTop), P(cutX, yBot), sdef.Item3, pb.Item3.X - cutX + 5, 5, sva, sma, out sv, out sm);
   if (sv == null) { log.Append(sdef.Item1 + " failed; "); continue; }
   sv.Name = sdef.Item1; sv.Modify(); if (sm != null) { sm.Attributes.MarkName = sdef.Item1; sm.Modify(); }
   var bx = boxes(sv); var pl8 = byId(bx, pb.Item1.Identifier.ID); var bm = byId(bx, mainPart.Identifier.ID);
@@ -153,19 +153,25 @@ foreach (var s in sec) {
   Tekla.Structures.Model.Operations.Operation.RunMacro("..\\drawings\\ClaudeSinglePartView.cs");
   log.Append("detail " + pos + "; ");
 }
-// galutinis išdėstymas pagal rėmelio centrą (Tekla perdėlioja vaizdus juos kuriant)
+// išdėstymas: viršuje pagrindinis (ir A-A), kiti vaizdai – laisvose zonose, kad neužliptų ant PASTABŲ (x>240, y<125)
 System.Action<TSD.View, double, double> place = (v, cx, cy) => {
   v.Select();
   v.Origin = new T3D.Point(cx - v.FrameOrigin.X - v.Width / 2, cy - v.FrameOrigin.Y - v.Height / 2, 0);
   v.Modify(); };
-place(main, 200, 240);
-if (va != null) place(va, 200, 180);
+double leftY = 287, rowX = 18, colY = 287, gap = 8;
+System.Action<TSD.View> pack = (v) => {
+  v.Select();
+  if (v.Width <= 115 && leftY - v.Height >= 125) { place(v, 18 + v.Width / 2, leftY - v.Height / 2); leftY -= v.Height + gap; }
+  else if (rowX + v.Width <= 238) { place(v, rowX + v.Width / 2, 70); rowX += v.Width + gap; }
+  else { place(v, 412 - v.Width / 2, colY - v.Height / 2); colY -= v.Height + gap; }
+};
 var all = new System.Collections.Generic.List<TSD.View>();
 var v3 = d.GetSheet().GetAllObjects(new[] { typeof(TSD.View) });
 while (v3.MoveNext()) { var v = v3.Current as TSD.View; if (v != null) all.Add(v); }
-double sx = 55;
-foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.SectionView && v.Name != "A").OrderBy(v => v.Name)) { place(v, sx, 100); sx += 60; }
 System.Func<TSD.View, int> nParts = (v) => { int c = 0; var pe = v.GetAllObjects(new[] { typeof(TSD.Part) }); while (pe.MoveNext()) c++; return c; };
-foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.FrontView)) { if (nParts(v) > 1) place(v, 200, 240); else { place(v, sx, 100); sx += 65; } }
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.FrontView && nParts(v) > 1)) place(v, 200, 245);
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.SectionView && v.Name == "A")) place(v, 200, 188);
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.SectionView && v.Name != "A").OrderBy(v => v.Name)) pack(v);
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.FrontView && nParts(v) == 1)) pack(v);
 d.CommitChanges();
 log.ToString()

@@ -24,6 +24,10 @@ foreach (var v in views) {
 }
 if (main == null) return "no front view";
 foreach (var v in views) if (v != main) v.Delete();
+var oldDims = new System.Collections.Generic.List<TSD.StraightDimensionSet>();
+var de = main.GetAllObjects(new[] { typeof(TSD.StraightDimensionSet) });
+while (de.MoveNext()) { var sd = de.Current as TSD.StraightDimensionSet; if (sd != null) oldDims.Add(sd); }
+foreach (var sd in oldDims) sd.Delete();
 main.Attributes.LoadAttributes("M.T assem.");
 main.Attributes.Scale = 10;
 main.Origin = new T3D.Point(150, 240, 0);
@@ -78,6 +82,10 @@ System.Action<TSD.View, double[], double[], double, double, double> dim = (vw, x
   for (int i = 0; i < xs.Length; i++) pl.Add(new T3D.Point(xs[i], ys[i], 0));
   dsh.CreateDimensionSet(vw, pl, new T3D.Vector(ux, uy, 0), paper * 10, da);
 };
+// gabaritai pagrindiniame vaizde: bendras ilgis apačioje, pado aukštis kairėje, viršutinės plokštelės dešinėje
+dim(main, new[] { bas.Item2.X, top.Item3.X }, new[] { bas.Item2.Y, top.Item2.Y }, 0, -1, 10);
+dim(main, new[] { bas.Item2.X, bas.Item2.X }, new[] { bas.Item2.Y, bas.Item3.Y }, -1, 0, 10);
+dim(main, new[] { top.Item3.X, top.Item3.X }, new[] { top.Item2.Y, top.Item3.Y }, 1, 0, 10);
 foreach (var sv in new[] { va, vb }) {
   var bx = boxes(sv);
   System.Tuple<TSM.Part, T3D.Point, T3D.Point> pp = null, pl8 = null;
@@ -132,10 +140,25 @@ while (pe2.MoveNext()) { var p = pe2.Current as TSD.Part; if (p != null && p.Mod
 d.CommitChanges();
 var sel = dh.GetDrawingObjectSelector(); sel.UnselectAllObjects(); sel.SelectObject(tp);
 Tekla.Structures.Model.Operations.Operation.RunMacro("..\\drawings\\ClaudeSinglePartView.cs");
-var ve2 = d.GetSheet().GetAllObjects(new[] { typeof(TSD.View) });
-while (ve2.MoveNext()) { var v = ve2.Current as TSD.View;
-  if (v == null || v.ViewType != TSD.View.ViewTypes.FrontView) continue;
-  int c = 0; var pe = v.GetAllObjects(new[] { typeof(TSD.Part) }); while (pe.MoveNext()) c++;
-  if (c == 1) { v.Origin = new T3D.Point(150, 120, 0); v.Modify(); log.Append("detail ok; "); } }
+// išdėstymas: viršuje pagrindinis (ir A-A), kiti vaizdai – laisvose zonose, kad neužliptų ant PASTABŲ (x>240, y<125)
+System.Action<TSD.View, double, double> place = (v, cx, cy) => {
+  v.Select();
+  v.Origin = new T3D.Point(cx - v.FrameOrigin.X - v.Width / 2, cy - v.FrameOrigin.Y - v.Height / 2, 0);
+  v.Modify(); };
+double leftY = 287, rowX = 18, colY = 287, gap = 8;
+System.Action<TSD.View> pack = (v) => {
+  v.Select();
+  if (v.Width <= 115 && leftY - v.Height >= 125) { place(v, 18 + v.Width / 2, leftY - v.Height / 2); leftY -= v.Height + gap; }
+  else if (rowX + v.Width <= 238) { place(v, rowX + v.Width / 2, 70); rowX += v.Width + gap; }
+  else { place(v, 412 - v.Width / 2, colY - v.Height / 2); colY -= v.Height + gap; }
+};
+var all = new System.Collections.Generic.List<TSD.View>();
+var v3 = d.GetSheet().GetAllObjects(new[] { typeof(TSD.View) });
+while (v3.MoveNext()) { var v = v3.Current as TSD.View; if (v != null) all.Add(v); }
+System.Func<TSD.View, int> nParts = (v) => { int c = 0; var pe = v.GetAllObjects(new[] { typeof(TSD.Part) }); while (pe.MoveNext()) c++; return c; };
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.FrontView && nParts(v) > 1)) place(v, 200, 230);
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.SectionView).OrderBy(v => v.Name)) { if (v.Name == "A") place(v, 80, 235); else place(v, 80, 160); }
+foreach (var v in all.Where(v => v.ViewType == TSD.View.ViewTypes.FrontView && nParts(v) == 1)) place(v, 200, 160);
+log.Append("detail ok; ");
 d.CommitChanges();
 log.ToString()
