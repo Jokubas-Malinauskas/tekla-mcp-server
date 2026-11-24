@@ -921,6 +921,31 @@ public static class DrawingContentTools
             "split", apply, limit));
     }
 
+    [McpServerTool(Name = "tekla_tidy_drawing_marks", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+    [Description("Tidy the marks of the ACTIVE drawing in one call: delete empty marks (typically " +
+                 "connection marks), delete bolt/hole marks in the listed views, and merge plain part " +
+                 "marks with identical text inside each view (\"2x 2418\"). The main view is the " +
+                 "non-section view with the most parts (key 'main'); other views are addressed by " +
+                 "their name (section letter, e.g. 'A'). A mark whose content cannot be read is never " +
+                 "deleted as empty; already merged marks are left alone. Preview unless apply=true.")]
+    public static DrawingWriteResult TidyDrawingMarks(
+        ITeklaModelService model,
+        [Description("Views whose bolt marks are deleted: 'main', view names, '*' = all, '-' = none. Default 'main,A'.")]
+        string? boltMarkViews = "main,A",
+        [Description("Delete marks with empty content. Default true.")] bool deleteEmpty = true,
+        [Description("Merge identical part marks per view. Default true.")] bool merge = true,
+        [Description("Set true to apply; false returns the plan.")] bool apply = false,
+        [Description(ToolHelpers.ExpectedModelPathDescription)] string? expectedModelPath = null)
+    {
+        var options = new MarkTidyOptions
+        {
+            BoltMarkViews = MarkTidyPlanner.ParseViewList(boltMarkViews),
+            DeleteEmpty = deleteEmpty,
+            Merge = merge,
+        };
+        return ToolHelpers.Write(model, expectedModelPath, () => model.TidyDrawingMarks(options, apply));
+    }
+
     private static DrawingWriteResult CreateOne(
         ITeklaModelService model,
         string kind,

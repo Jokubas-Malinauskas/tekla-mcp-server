@@ -474,6 +474,13 @@ public interface ITeklaModelService
         bool apply,
         int? limit = null);
 
+    /// <summary>
+    /// Tidy the marks of the ACTIVE drawing in one pass (<see cref="MarkTidyPlanner"/>): delete
+    /// empty marks, delete bolt marks in the listed views, merge identical part marks per view.
+    /// Preview unless apply. "No active drawing" is a message, not an exception.
+    /// </summary>
+    DrawingWriteResult TidyDrawingMarks(MarkTidyOptions options, bool apply);
+
     // -- Script escape hatch ----------------------------------------------------------------
 
     /// <summary>

@@ -295,6 +295,7 @@ file names are passed to Tekla and resolved by the running environment.
 | `tekla_modify_drawing_objects` | Batch-change text, relative position, visibility, or loaded attributes; on marks also insertion point, leader start and content. |
 | `tekla_delete_drawing_objects` | Delete objects by best-effort ID/type/current editor selection. |
 | `tekla_merge_drawing_marks` | Merge compatible marks by best-effort IDs/current selection. |
+| `tekla_tidy_drawing_marks` | One-pass mark cleanup of the active drawing: delete empty marks and bolt marks in listed views (`main`, view names, `*`), merge identical part marks per view. Preview unless `apply`. |
 | `tekla_split_drawing_marks` | Split merged mark sets by best-effort IDs/current selection. |
 
 Drawing inputs use three explicit coordinate spaces:

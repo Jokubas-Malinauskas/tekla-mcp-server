@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tekla_tidy_drawing_marks` (J.M fork): one call deletes empty marks and bolt marks in the listed
+  views and merges identical part marks per view (`Core/MarkTidyPlanner`, shared by both backends).
+  Drawing scripts cannot do this: reading a Mark in a script fails with "LeaderLinePlacing is not
+  marked as serializable".
+
 ## [0.9.0] - 2026-10-19
 
 Field fixes from Tekla 2021 audit and drawing sessions (monorail plans, truss nodes): numeric UDAs

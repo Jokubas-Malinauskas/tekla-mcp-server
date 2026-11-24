@@ -245,6 +245,103 @@ public sealed partial class TeklaModelService
         return result;
     }
 
+    public DrawingWriteResult TidyDrawingMarks(MarkTidyOptions options, bool apply)
+    {
+        var result = NewDrawingWriteResult("tidy_drawing_marks", apply);
+        try
+        {
+            var handler = GetDrawingHandler();
+            var active = TryGetActiveDrawing(handler);
+            if (active == null)
+            {
+                result.Message = "No active drawing.";
+                return result;
+            }
+
+            // Main view = the non-section view with the most parts (same rule as the J.M scripts).
+            var views = EnumerateViews(active);
+            TSD.View? main = null;
+            var bestParts = -1;
+            foreach (var view in views)
+            {
+                if (view.ViewType == TSD.View.ViewTypes.SectionView) continue;
+                var parts = ReadOwnedObjects(view, new[] { typeof(TSD.Part) }).Count;
+                if (parts > bestParts) { bestParts = parts; main = view; }
+            }
+
+            // Only plain (unmerged) marks: an already merged MarkSet is left as it is.
+            var records = new List<DrawingObjectRecord>();
+            var items = new List<MarkTidyItem>();
+            for (var viewIndex = 0; viewIndex < views.Count; viewIndex++)
+            {
+                var view = views[viewIndex];
+                var viewKey = ReferenceEquals(view, main) ? MarkTidyPlanner.MainViewKey : view.Name ?? "";
+                foreach (var obj in ReadOwnedObjects(view, new[] { typeof(TSD.Mark) }))
+                {
+                    if (!(obj is TSD.Mark mark) || obj.GetType() != typeof(TSD.Mark)) continue;
+                    MarkReading reading;
+                    try { reading = ReadMark(mark); }
+                    catch (Exception ex) when (!ConnectionErrors.IsTeklaConnectionFailure(ex)) { continue; }
+                    items.Add(new MarkTidyItem
+                    {
+                        Key = records.Count,
+                        ViewIndex = viewIndex,
+                        ViewKey = viewKey,
+                        RelatedType = reading.Related?.GetType().Name ?? "",
+                        IsEmpty = reading.IsEmpty,
+                        Text = reading.Text ?? "",
+                    });
+                    records.Add(new DrawingObjectRecord
+                    {
+                        Object = mark,
+                        View = view,
+                        Index = records.Count,
+                        ViewIndex = viewIndex,
+                    });
+                }
+            }
+
+            var plan = MarkTidyPlanner.Plan(items, options);
+            result.PlannedCount = plan.Delete.Count + plan.MergeGroups.Count;
+            var previewQuery = new DrawingObjectQuery();
+            result.ObjectPreview.AddRange(plan.Delete
+                .Concat(plan.MergeGroups.Select(g => g[0]))
+                .Take(20)
+                .Select(k => MapDrawingObject(records[k], previewQuery)));
+            result.Message = "delete " + plan.Delete.Count + " (empty " + plan.DeletedEmpty +
+                ", bolt " + plan.DeletedBolt + "), merge " + plan.MergeGroups.Count + " group(s) of " +
+                plan.MergeGroups.Sum(g => g.Count) + " marks; main view: " +
+                (main == null ? "(none)" : "\"" + (main.Name ?? "") + "\" " + main.ViewType);
+            if (!apply) return result;
+
+            foreach (var key in plan.Delete)
+            {
+                if (records[key].Object.Delete()) result.DeletedCount++;
+                else result.Errors.Add("Tekla refused to delete mark #" + key + ".");
+            }
+            foreach (var group in plan.MergeGroups)
+            {
+                var marks = group.Select(k => (TSD.MarkBase)records[k].Object).ToList();
+                List<TSD.MarkBase> merged;
+                if (TSD.Operations.Operation.MergeMarks(marks, out merged))
+                {
+                    result.ModifiedCount += marks.Count;
+                    result.CreatedCount += merged?.Count ?? 0;
+                }
+                else
+                {
+                    result.Errors.Add("Tekla rejected MergeMarks() for " + marks.Count + " marks.");
+                }
+            }
+            CommitActiveDrawingChanges(active, "Tekla MCP: tidy drawing marks", result);
+        }
+        catch (Exception ex)
+        {
+            result.Message = DrawingFailure(result, ex);
+        }
+        return result;
+    }
+
     private static DrawingObjectInfo PreviewDrawingObject(DrawingObjectSpec spec) =>
         new DrawingObjectInfo
         {

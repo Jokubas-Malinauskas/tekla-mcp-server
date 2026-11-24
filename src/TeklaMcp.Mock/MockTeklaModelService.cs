@@ -1882,6 +1882,42 @@ public sealed partial class MockTeklaModelService : ITeklaModelService
         return result;
     }
 
+    public DrawingWriteResult TidyDrawingMarks(MarkTidyOptions options, bool apply)
+    {
+        var result = NewDrawingResult("tidy_drawing_marks", apply);
+        if (string.IsNullOrWhiteSpace(_activeDrawingKey))
+        {
+            result.Message = "No active drawing.";
+            return result;
+        }
+        var marks = FindDrawingObjects(new DrawingObjectQuery(), 1000)
+            .Where(o => o.Type == "Mark")
+            .ToList();
+        var mainView = marks.GroupBy(m => m.ViewIndex)
+            .OrderByDescending(g => g.Count()).Select(g => (int?)g.Key).FirstOrDefault();
+        var items = marks.Select((m, i) => new MarkTidyItem
+        {
+            Key = i,
+            ViewIndex = m.ViewIndex,
+            ViewKey = m.ViewIndex == mainView ? MarkTidyPlanner.MainViewKey : m.ViewName,
+            RelatedType = m.RelatedObjectType ?? "",
+            IsEmpty = m.IsEmptyMark,
+            Text = m.Text ?? "",
+        }).ToList();
+        var plan = MarkTidyPlanner.Plan(items, options);
+        result.PlannedCount = plan.Delete.Count + plan.MergeGroups.Count;
+        result.ObjectPreview.AddRange(plan.Delete.Select(k => marks[k])
+            .Concat(plan.MergeGroups.Select(g => marks[g[0]])).Take(20));
+        if (apply)
+        {
+            result.DeletedCount = plan.Delete.Count;
+            result.ModifiedCount = plan.MergeGroups.Sum(g => g.Count);
+            result.CreatedCount = plan.MergeGroups.Count;
+        }
+        _drawingSaves.Committed(result);
+        return result;
+    }
+
     // ---------------------------------------------------------------- scripts ----
 
     public ScriptResult ExecuteScript(
